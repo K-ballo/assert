@@ -7,22 +7,26 @@
 
 # ── Verify interface header sets ────────────────────────────────────────────
 
-add_test(
-    NAME eggs.assert.verify_headers
-    COMMAND
-        ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target
-        _eggs_assert_verify_interface_header_sets --config $<CONFIG>
-)
-set_tests_properties(
-    eggs.assert.verify_headers
-    PROPERTIES LABELS "header" RESOURCE_LOCK cmake_build
-)
+foreach(_suffix static shared)
+    add_test(
+        NAME eggs.assert.verify_headers.${_suffix}
+        COMMAND
+            ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target
+            _eggs_assert_${_suffix}_verify_interface_header_sets --config
+            $<CONFIG>
+    )
+    set_tests_properties(
+        eggs.assert.verify_headers.${_suffix}
+        PROPERTIES LABELS "header" RESOURCE_LOCK cmake_build
+    )
+endforeach()
 
 # add_lib_test(<name> [WILL_CRASH <expr>] [DEBUG_ONLY])
 #
-# Builds <name>.cpp as a test executable linked against Eggs::Assert and
-# registers it with CTest under the label "unit". The test is run via
-# run_verify.cmake, which checks the exit behaviour:
+# Builds <name>.cpp as two test executables — one linked against
+# _eggs_assert_static and one against _eggs_assert_shared — and registers
+# both with CTest under the label "unit" with names
+# eggs.assert.<name>.static / eggs.assert.<name>.shared.
 #
 #   WILL_CRASH <expr>   generator expression; truthy = expects abort,
 #                       falsy/omitted = expects clean exit (code 0).
@@ -44,35 +48,43 @@ function(add_lib_test name)
         return()
     endif()
 
-    add_executable(${name})
-    if(ARG_DEBUG_ONLY)
-        # Non-Debug configs compile a no-op stub so the source (which #errors on
-        # NDEBUG) is never compiled in Release. CTest is gated via CONFIGURATIONS.
-        target_sources(
-            ${name}
-            PRIVATE
-                "$<$<CONFIG:Debug>:${CMAKE_CURRENT_SOURCE_DIR}/${name}.cpp>"
-                "$<$<NOT:$<CONFIG:Debug>>:${CMAKE_CURRENT_FUNCTION_LIST_DIR}/empty_stub.cpp>"
+    foreach(_suffix static shared)
+        set(_target ${name}_${_suffix})
+        add_executable(${_target})
+        if(ARG_DEBUG_ONLY)
+            # Non-Debug configs compile a no-op stub so the source (which
+            # #errors on NDEBUG) is never compiled in Release. CTest is gated
+            # via CONFIGURATIONS.
+            target_sources(
+                ${_target}
+                PRIVATE
+                    "$<$<CONFIG:Debug>:${CMAKE_CURRENT_SOURCE_DIR}/${name}.cpp>"
+                    "$<$<NOT:$<CONFIG:Debug>>:${CMAKE_CURRENT_FUNCTION_LIST_DIR}/empty_stub.cpp>"
+            )
+            set(_configurations CONFIGURATIONS Debug)
+        else()
+            target_sources(${_target} PRIVATE "${name}.cpp")
+            unset(_configurations)
+        endif()
+        target_link_libraries(
+            ${_target}
+            PRIVATE _eggs_assert_${_suffix} Eggs::Assert::SuppressAbortDialog
         )
-        set(_configurations CONFIGURATIONS Debug)
-    else()
-        target_sources(${name} PRIVATE "${name}.cpp")
-    endif()
-    target_link_libraries(
-        ${name}
-        PRIVATE Eggs::Assert Eggs::Assert::SuppressAbortDialog
-    )
 
-    _eggs_assert_setup_shared(${name})
-    add_test(
-        NAME eggs.assert.${name}
-        ${_configurations}
-        COMMAND
-            ${CMAKE_COMMAND} -DCMD=$<TARGET_FILE:${name}>
-            -DWILL_CRASH=${ARG_WILL_CRASH} -P
-            "${PROJECT_SOURCE_DIR}/support/run_verify.cmake"
-    )
-    set_tests_properties(eggs.assert.${name} PROPERTIES LABELS "unit")
+        _eggs_assert_setup_shared(${_target} _eggs_assert_${_suffix})
+        add_test(
+            NAME eggs.assert.${name}.${_suffix}
+            ${_configurations}
+            COMMAND
+                ${CMAKE_COMMAND} -DCMD=$<TARGET_FILE:${_target}>
+                -DWILL_CRASH=${ARG_WILL_CRASH} -P
+                "${PROJECT_SOURCE_DIR}/support/run_verify.cmake"
+        )
+        set_tests_properties(
+            eggs.assert.${name}.${_suffix}
+            PROPERTIES LABELS "unit"
+        )
+    endforeach()
 endfunction()
 
 # ── Re-includability ──────────────────────────────────────────────────────────
@@ -99,20 +111,25 @@ add_lib_test(assert_single_eval DEBUG_ONLY)
 
 # ── assert.h in C mode ────────────────────────────────────────────────────────
 
-add_executable(assert_h_c assert_h_c.c)
-set_target_properties(assert_h_c PROPERTIES LINKER_LANGUAGE CXX)
-target_link_libraries(
-    assert_h_c
-    PRIVATE Eggs::Assert Eggs::Assert::SuppressAbortDialog
-)
+foreach(_suffix static shared)
+    add_executable(assert_h_c_${_suffix} assert_h_c.c)
+    set_target_properties(assert_h_c_${_suffix} PROPERTIES LINKER_LANGUAGE CXX)
+    target_link_libraries(
+        assert_h_c_${_suffix}
+        PRIVATE _eggs_assert_${_suffix} Eggs::Assert::SuppressAbortDialog
+    )
 
-_eggs_assert_setup_shared(assert_h_c)
+    _eggs_assert_setup_shared(assert_h_c_${_suffix} _eggs_assert_${_suffix})
 
-add_test(
-    NAME eggs.assert.assert_h_c
-    COMMAND
-        ${CMAKE_COMMAND} -DCMD=$<TARGET_FILE:assert_h_c>
-        -DWILL_CRASH=$<CONFIG:Debug> -P
-        "${PROJECT_SOURCE_DIR}/support/run_verify.cmake"
-)
-set_tests_properties(eggs.assert.assert_h_c PROPERTIES LABELS "unit")
+    add_test(
+        NAME eggs.assert.assert_h_c.${_suffix}
+        COMMAND
+            ${CMAKE_COMMAND} -DCMD=$<TARGET_FILE:assert_h_c_${_suffix}>
+            -DWILL_CRASH=$<CONFIG:Debug> -P
+            "${PROJECT_SOURCE_DIR}/support/run_verify.cmake"
+    )
+    set_tests_properties(
+        eggs.assert.assert_h_c.${_suffix}
+        PROPERTIES LABELS "unit"
+    )
+endforeach()

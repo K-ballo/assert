@@ -35,8 +35,16 @@ add_library(
 )
 
 # Ensures the eggs_assert DLL is findable at runtime for the given target.
+# Optional second argument: the concrete library target to inspect (defaults to
+# the target aliased by Eggs::Assert).
 function(_eggs_assert_setup_shared target)
-    get_target_property(_type _eggs_assert TYPE)
+    if(ARGC GREATER 1)
+        set(_lib ${ARGV1})
+    else()
+        get_target_property(_lib Eggs::Assert ALIASED_TARGET)
+    endif()
+
+    get_target_property(_type ${_lib} TYPE)
     if(NOT _type STREQUAL "SHARED_LIBRARY")
         return()
     endif()
@@ -46,13 +54,13 @@ function(_eggs_assert_setup_shared target)
             TARGET ${target}
             POST_BUILD
             COMMAND
-                ${CMAKE_COMMAND} -E copy_if_different
-                $<TARGET_FILE:_eggs_assert> $<TARGET_FILE_DIR:${target}>
+                ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:${_lib}>
+                $<TARGET_FILE_DIR:${target}>
         )
     else()
         set_target_properties(
             ${target}
-            PROPERTIES BUILD_RPATH "$<TARGET_FILE_DIR:_eggs_assert>"
+            PROPERTIES BUILD_RPATH "$<TARGET_FILE_DIR:${_lib}>"
         )
     endif()
 endfunction()
