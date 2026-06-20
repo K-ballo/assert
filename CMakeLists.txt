@@ -34,6 +34,7 @@ if(PROJECT_IS_TOP_LEVEL)
     option(BUILD_SHARED_LIBS "Build as a shared library" OFF)
     include(CTest)
     option(ENABLE_INSTALL "Generate install rules" ON)
+    set(SYSTEM FALSE)
 else()
     option(EGGS_ASSERT_BUILD_DOCS "Build the documentation" OFF)
     option(EGGS_ASSERT_BUILD_EXAMPLES "Build the examples" OFF)
@@ -51,6 +52,7 @@ else()
     set(BUILD_SHARED_LIBS ${EGGS_ASSERT_BUILD_SHARED_LIBS})
     set(BUILD_TESTING ${EGGS_ASSERT_BUILD_TESTING})
     set(ENABLE_INSTALL ${EGGS_ASSERT_ENABLE_INSTALL})
+    set(SYSTEM TRUE)
 endif()
 
 #
@@ -66,6 +68,7 @@ foreach(_target _eggs_assert_static _eggs_assert_shared)
         ${_target}
         PROPERTIES
             OUTPUT_NAME eggs_assert
+            SYSTEM ${SYSTEM}
             VERIFY_INTERFACE_HEADER_SETS ${BUILD_TESTING}
     )
     target_compile_features(${_target} PUBLIC cxx_std_23)
@@ -151,7 +154,9 @@ add_library(_eggs_assert_intercept_shared INTERFACE)
 foreach(_target _eggs_assert_intercept_static _eggs_assert_intercept_shared)
     set_target_properties(
         ${_target}
-        PROPERTIES VERIFY_INTERFACE_HEADER_SETS ${BUILD_TESTING}
+        PROPERTIES
+            SYSTEM ${SYSTEM}
+            VERIFY_INTERFACE_HEADER_SETS ${BUILD_TESTING}
     )
     target_compile_definitions(
         ${_target}
