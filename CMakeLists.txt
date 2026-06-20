@@ -65,12 +65,14 @@ foreach(_target _eggs_assert_static _eggs_assert_shared)
     set_target_properties(
         ${_target}
         PROPERTIES
-            EXPORT_NAME Assert
             OUTPUT_NAME eggs_assert
             VERIFY_INTERFACE_HEADER_SETS ${BUILD_TESTING}
     )
     target_compile_features(${_target} PUBLIC cxx_std_23)
 endforeach()
+
+set_target_properties(_eggs_assert_static PROPERTIES EXPORT_NAME Assert::Static)
+set_target_properties(_eggs_assert_shared PROPERTIES EXPORT_NAME Assert::Shared)
 
 if(MSVC)
     set_target_properties(
@@ -142,9 +144,7 @@ add_library(_eggs_assert_intercept_shared INTERFACE)
 foreach(_target _eggs_assert_intercept_static _eggs_assert_intercept_shared)
     set_target_properties(
         ${_target}
-        PROPERTIES
-            EXPORT_NAME Assert::Intercept
-            VERIFY_INTERFACE_HEADER_SETS ${BUILD_TESTING}
+        PROPERTIES VERIFY_INTERFACE_HEADER_SETS ${BUILD_TESTING}
     )
     target_compile_definitions(
         ${_target}
@@ -159,6 +159,15 @@ foreach(_target _eggs_assert_intercept_static _eggs_assert_intercept_shared)
             $<INSTALL_INTERFACE:include/eggs>
     )
 endforeach()
+
+set_target_properties(
+    _eggs_assert_intercept_static
+    PROPERTIES EXPORT_NAME Assert::Intercept::Static
+)
+set_target_properties(
+    _eggs_assert_intercept_shared
+    PROPERTIES EXPORT_NAME Assert::Intercept::Shared
+)
 
 target_link_libraries(
     _eggs_assert_intercept_static
@@ -206,42 +215,41 @@ endif()
 if(ENABLE_INSTALL)
     include(CMakePackageConfigHelpers)
 
-    if(BUILD_SHARED_LIBS)
-        set(_eggs_assert_install_target _eggs_assert_shared)
-        set(_eggs_assert_intercept_install_target _eggs_assert_intercept_shared)
-    else()
-        set(_eggs_assert_install_target _eggs_assert_static)
-        set(_eggs_assert_intercept_install_target _eggs_assert_intercept_static)
-    endif()
-
+    # Static and shared are installed to separate subdirectories to avoid the
+    # eggs_assert.lib filename collision between the static archive and the DLL
+    # import library on Windows.
     install(
-        TARGETS
-            ${_eggs_assert_install_target}
-            ${_eggs_assert_intercept_install_target}
+        TARGETS _eggs_assert_static
+        EXPORT EggsAssertTargets
+        FILE_SET HEADERS DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}/static
+    )
+    install(
+        TARGETS _eggs_assert_shared
         EXPORT EggsAssertTargets
         FILE_SET HEADERS DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     )
+    install(
+        TARGETS _eggs_assert_intercept_static _eggs_assert_intercept_shared
+        EXPORT EggsAssertTargets
+    )
 
     if(MSVC)
-        if(BUILD_SHARED_LIBS)
-            install(
-                FILES "$<TARGET_PDB_FILE:_eggs_assert_shared>"
-                DESTINATION ${CMAKE_INSTALL_BINDIR}
-                CONFIGURATIONS Debug RelWithDebInfo
-                OPTIONAL
-            )
-        else()
-            install(
-                FILES
-                    "${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/eggs_assert_static.pdb"
-                DESTINATION ${CMAKE_INSTALL_LIBDIR}
-                CONFIGURATIONS Debug RelWithDebInfo
-                OPTIONAL
-            )
-        endif()
+        install(
+            FILES "$<TARGET_PDB_FILE:_eggs_assert_shared>"
+            DESTINATION ${CMAKE_INSTALL_BINDIR}
+            CONFIGURATIONS Debug RelWithDebInfo
+            OPTIONAL
+        )
+        install(
+            FILES "${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/eggs_assert_static.pdb"
+            DESTINATION ${CMAKE_INSTALL_LIBDIR}/static
+            CONFIGURATIONS Debug RelWithDebInfo
+            OPTIONAL
+        )
     endif()
 
     install(

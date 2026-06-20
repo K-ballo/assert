@@ -2,4 +2,18 @@
 
 include("${CMAKE_CURRENT_LIST_DIR}/eggs.assert-targets.cmake")
 
+# Eggs::Assert and Eggs::Assert::Intercept are convenience aliases.
+# Both ::Static and ::Shared are available when the dual package is installed;
+# BUILD_SHARED_LIBS (evaluated at find_package time) selects the default.
+if(
+    TARGET Eggs::Assert::Shared
+    AND (BUILD_SHARED_LIBS OR NOT TARGET Eggs::Assert::Static)
+)
+    add_library(Eggs::Assert ALIAS Eggs::Assert::Shared)
+    add_library(Eggs::Assert::Intercept ALIAS Eggs::Assert::Intercept::Shared)
+elseif(TARGET Eggs::Assert::Static)
+    add_library(Eggs::Assert ALIAS Eggs::Assert::Static)
+    add_library(Eggs::Assert::Intercept ALIAS Eggs::Assert::Intercept::Static)
+endif()
+
 check_required_components(Eggs.Assert)

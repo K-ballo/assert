@@ -260,38 +260,17 @@ jobs:
 
       # -----------------------------------------------------------------------
       # Install variant — simulates a real end-user find_package workflow
-      # (main only)
+      # (main only). Both static and shared are installed to a single prefix;
+      # the find_package tests verify both by toggling BUILD_SHARED_LIBS.
       # -----------------------------------------------------------------------
 
-      - name: Configure (shared, for install)
-        id: shared_install_configure
-        if: github.ref == 'refs/heads/main'
-        run: cmake --preset ${{ matrix.preset }} -B build/${{ matrix.preset }}-shared
-               -DBUILD_DOCS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_SHARED_LIBS=ON -DBUILD_TESTING=OFF
-
-      - name: Build (shared, Debug, for install)
-        id: shared_install_build
-        if: >-
-          github.ref == 'refs/heads/main'
-          && steps.shared_install_configure.outcome == 'success'
-        run: cmake --build build/${{ matrix.preset }}-shared --config Debug
-
-      - name: Test Install (static)
-        id: install_static
+      - name: Install
+        id: install
         if: >-
           github.ref == 'refs/heads/main'
           && steps.build_debug.outcome == 'success'
         run: cmake --install build/${{ matrix.preset }}
-               --prefix ${{ runner.temp }}/eggs-assert-install-static
-               --config Debug
-
-      - name: Test Install (shared)
-        id: install_shared
-        if: >-
-          github.ref == 'refs/heads/main'
-          && steps.shared_install_build.outcome == 'success'
-        run: cmake --install build/${{ matrix.preset }}-shared
-               --prefix ${{ runner.temp }}/eggs-assert-install-shared
+               --prefix ${{ runner.temp }}/eggs-assert-install
                --config Debug
 
       - name: Clean Source and Build Tree
@@ -308,10 +287,10 @@ jobs:
         id: fp_static_configure
         if: >-
           github.ref == 'refs/heads/main'
-          && steps.install_static.outcome == 'success'
+          && steps.install.outcome == 'success'
         working-directory: test/cmake-find_package
         run: cmake --preset ${{ matrix.preset }} -B build-consumer-find_package-static
-               -DCMAKE_PREFIX_PATH=${{ runner.temp }}/eggs-assert-install-static
+               -DCMAKE_PREFIX_PATH=${{ runner.temp }}/eggs-assert-install
                --debug-find-pkg=Eggs.Assert
 
       - name: Test Consumer (find_package, static) — Build
@@ -332,10 +311,11 @@ jobs:
         id: fp_shared_configure
         if: >-
           github.ref == 'refs/heads/main'
-          && steps.install_shared.outcome == 'success'
+          && steps.install.outcome == 'success'
         working-directory: test/cmake-find_package
         run: cmake --preset ${{ matrix.preset }} -B build-consumer-find_package-shared
-               -DCMAKE_PREFIX_PATH=${{ runner.temp }}/eggs-assert-install-shared
+               -DCMAKE_PREFIX_PATH=${{ runner.temp }}/eggs-assert-install
+               -DBUILD_SHARED_LIBS=ON
                --debug-find-pkg=Eggs.Assert
 
       - name: Test Consumer (find_package, shared) — Build
