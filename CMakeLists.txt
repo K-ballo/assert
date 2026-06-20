@@ -79,6 +79,7 @@ if(MSVC)
         _eggs_assert_static
         PROPERTIES
             COMPILE_PDB_NAME "eggs_assert_static"
+            COMPILE_PDB_NAME_DEBUG "eggs_assert_static_d"
             COMPILE_PDB_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>"
     )
     set_target_properties(
@@ -92,13 +93,19 @@ endif()
 if(WIN32)
     # Both targets produce eggs_assert.lib (static archive vs DLL import library).
     # Use separate subdirectories so multi-config generators don't collide.
+    # DEBUG_POSTFIX d distinguishes Debug from Release in the install tree
+    # (eggs_assert_d.lib / eggs_assert_d.dll for Debug).
     set_target_properties(
         _eggs_assert_static
-        PROPERTIES ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/static"
+        PROPERTIES
+            ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/static"
+            DEBUG_POSTFIX d
     )
     set_target_properties(
         _eggs_assert_shared
-        PROPERTIES ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/shared"
+        PROPERTIES
+            ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/shared"
+            DEBUG_POSTFIX d
     )
 endif()
 
@@ -245,7 +252,8 @@ if(ENABLE_INSTALL)
             OPTIONAL
         )
         install(
-            FILES "${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/eggs_assert_static.pdb"
+            FILES
+                "${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/eggs_assert_static$<$<CONFIG:Debug>:_d>.pdb"
             DESTINATION ${CMAKE_INSTALL_LIBDIR}/static
             CONFIGURATIONS Debug RelWithDebInfo
             OPTIONAL
